@@ -1,3 +1,4 @@
+import org.junit.Test;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.Pipeline;
 import redis.clients.jedis.Transaction;
@@ -36,7 +37,19 @@ public class Chapter05 {
     }
 
 
-    public static void main(String[] args) {
+    @Test
+    public void testRecentLog() {
+        Jedis conn = new Jedis("localhost");
+        conn.select(15);
+        for (int i = 0; i < 5; i++) {
+            logRecent(conn, "test", "this is test message " + i);
+        }
+        List<String> recentLogs = conn.lrange("recent:test:" + INFO, 0, -1);
+        if (recentLogs != null && !recentLogs.isEmpty()) {
+            for (String recentLog : recentLogs) {
+                System.out.println(recentLog);
+            }
+        }
     }
 
 
@@ -82,7 +95,16 @@ public class Chapter05 {
         只保留从start（含）到end（含）偏移量的元素。
          */
         pip.ltrim(key, 0, 99);
-        pip.exec();
+        // 批量执行流水，之前的版本使用的是exec()方法，
+        // 但是exec()方法执行时如果之前没有开启一个事务，就会报错。
+        // 因此修复该bug并使用sync()方法，
+        // sync()仅仅是批量执行多个命令不保证事务，
+        // 可以降低redis客户端和服务器之间的连接频率，
+        // 如果用户需要向redis发送多个命令，并且对于这些命令来说
+        // 一个命令的执行结果不会影响另一个命令的输入，
+        // 而且这些命令也不需要以事务的方法来执行，那么可以使用该方法。
+//        pip.exec();
+        pip.sync();
     }
 
     /**
