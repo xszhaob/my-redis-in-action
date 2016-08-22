@@ -11,6 +11,10 @@
     <properties>
         <jedis_version>2.8.0</jedis_version>
         <gson_version>2.6.2</gson_version>
+
+
+        <!--test lib-->
+        <junit_version>4.11</junit_version>
     </properties>
 
     <dependencyManagement>
@@ -27,12 +31,21 @@
                 <artifactId>gson</artifactId>
                 <version>${gson_version}</version>
             </dependency>
+            <dependency>
+                <groupId>junit</groupId>
+                <artifactId>junit</artifactId>
+                <version>${junit_version}</version>
+            </dependency>
         </dependencies>
     </dependencyManagement>
     <dependencies>
         <dependency>
             <groupId>redis.clients</groupId>
             <artifactId>jedis</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
         </dependency>
     </dependencies>
 
