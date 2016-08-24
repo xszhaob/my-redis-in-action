@@ -7,6 +7,7 @@ import java.text.Collator;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
+import java.util.Set;
 import java.util.TimeZone;
 
 /**
@@ -29,7 +30,7 @@ public class Chapter05 {
     private static final Collator COLLATOR = Collator.getInstance();
 
     private static final SimpleDateFormat TIMESTAMP = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-    private static final SimpleDateFormat ISO_FORMAT = new SimpleDateFormat("yyyy-MM-dd'T'HH:00:00");
+    private static final SimpleDateFormat ISO_FORMAT = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:00");
 
     static {
         // 协调世界时，又称世界统一时间，世界标准时间，国际协调时间，简称UTC
@@ -49,6 +50,28 @@ public class Chapter05 {
             for (String recentLog : recentLogs) {
                 System.out.println(recentLog);
             }
+        }
+    }
+
+
+    @Test
+    public void testCommonLog() {
+        Jedis conn = new Jedis("localhost");
+        conn.select(0);
+        logCommon(conn,"test","this is test message " + 1,INFO,100);
+        printRedisData(conn);
+        List<String> lrange = conn.lrange("recent:test:" + INFO, 0, -1);
+        for (String s : lrange) {
+            System.out.println(s);
+        }
+        System.out.println(conn.zscore("common:test:" + INFO,"this is test message " + 1));
+    }
+
+
+    private void printRedisData(Jedis conn) {
+        Set<String> keys = conn.keys("*");
+        for (String key : keys) {
+            System.out.println(key);
         }
     }
 
@@ -136,6 +159,8 @@ public class Chapter05 {
             String hourStart = ISO_FORMAT.format(new Date());
 
             String existing = conn.get(startKey);
+            System.out.println(hourStart);
+            System.out.println(existing);
             Transaction trans = conn.multi();
             // 如果常见日志消息列表记录的是上一个小时的日志
             if (existing != null && COLLATOR.compare(existing, hourStart) < 0) {
@@ -145,6 +170,9 @@ public class Chapter05 {
                 trans.rename(startKey, commonDesc + ":pstart");
                 // 设置日志所处的小时数
                 trans.set(startKey, hourStart);
+            }
+            else {
+                trans.set(startKey,hourStart);
             }
             // 为有序集commonDesc的message成员的分值加上1
             trans.zincrby(commonDesc, 1, message);
