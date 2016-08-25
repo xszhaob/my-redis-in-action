@@ -191,5 +191,20 @@ public class Chapter05 {
         }
     }
 
+    private static final int[] PRECISION = new int[]{1, 5, 60, 300, 3600, 18000, 86400};
+    private void updateCounter(Jedis conn,String name,int count) {
+        updateCounter(conn,name,count,System.currentTimeMillis() / 1000);
+    }
+    private void updateCounter(Jedis conn,String name,int count,long now) {
+        Transaction trans = conn.multi();
+        for (int i : PRECISION) {
+            long pnow = (now / i) * i;
+            String hash = String.valueOf(pnow) + ":" + name;
+            trans.zadd("known:",0,hash);
+            trans.hincrBy("count:" + hash,String.valueOf(pnow),count);
+        }
+        trans.exec();
+    }
+
 
 }
