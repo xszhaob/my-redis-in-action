@@ -1,3 +1,4 @@
+import javafx.util.Pair;
 import org.junit.Test;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.Pipeline;
@@ -58,13 +59,13 @@ public class Chapter05 {
     public void testCommonLog() {
         Jedis conn = new Jedis("localhost");
         conn.select(0);
-        logCommon(conn,"test","this is test message " + 1,INFO,100);
+        logCommon(conn, "test", "this is test message " + 1, INFO, 100);
         printRedisData(conn);
         List<String> lrange = conn.lrange("recent:test:" + INFO, 0, -1);
         for (String s : lrange) {
             System.out.println(s);
         }
-        System.out.println(conn.zscore("common:test:" + INFO,"this is test message " + 1));
+        System.out.println(conn.zscore("common:test:" + INFO, "this is test message " + 1));
     }
 
 
@@ -170,9 +171,8 @@ public class Chapter05 {
                 trans.rename(startKey, commonDesc + ":pstart");
                 // 设置日志所处的小时数
                 trans.set(startKey, hourStart);
-            }
-            else {
-                trans.set(startKey,hourStart);
+            } else {
+                trans.set(startKey, hourStart);
             }
             // 为有序集commonDesc的message成员的分值加上1
             trans.zincrby(commonDesc, 1, message);
@@ -192,18 +192,52 @@ public class Chapter05 {
     }
 
     private static final int[] PRECISION = new int[]{1, 5, 60, 300, 3600, 18000, 86400};
-    private void updateCounter(Jedis conn,String name,int count) {
-        updateCounter(conn,name,count,System.currentTimeMillis() / 1000);
+
+    private void updateCounter(Jedis conn, String name, int count) {
+        updateCounter(conn, name, count, System.currentTimeMillis() / 1000);
     }
-    private void updateCounter(Jedis conn,String name,int count,long now) {
+
+    /**
+     * 利用计数器记录数据和记录计数器。
+     * 针对计数器系统，我们需要计数器记录计数信息，
+     * 同时还需要一个计数器集合用以记录正在使用的计数器信息。
+     * 1.计数器：以网站点击量计数器为例，计数器以不同的时间精度存储最新的120个数据样本；
+     * 2.计数器集合：计数器集合需要元素不能重复并且有序，我们可以使用有序序列作为数据结构，
+     * 有序集合用计数器名称及时间精度组成成员，而所有的成员分值都为0。
+     * <p/>
+     * 注：当有序集合中分值都相等时，Redis将根据成员名称进行排序。
+     *
+     * @param conn  redis连接
+     * @param name  计数器名称
+     * @param count 计数次数
+     * @param now   计数时的时间
+     */
+    private void updateCounter(Jedis conn, String name, int count, long now) {
+        // multi标记一个事务块的开始
         Transaction trans = conn.multi();
         for (int i : PRECISION) {
             long pnow = (now / i) * i;
             String hash = String.valueOf(pnow) + ":" + name;
-            trans.zadd("known:",0,hash);
-            trans.hincrBy("count:" + hash,String.valueOf(pnow),count);
+            // 把计数器记入“已有计数器”的有序集合，并将其分值设置为0，便于以后执行清理动作
+            trans.zadd("known:", 0, hash);
+            // 给定的计数器更新计数信息
+            trans.hincrBy("count:" + hash, String.valueOf(pnow), count);
         }
+        // 执行一个事务块中的一系列命令
         trans.exec();
+    }
+
+
+    /**
+     * 获取给定精度的计数器记录数据集
+     * @param conn
+     * @param name
+     * @param precision
+     * @return
+     */
+    private List<Pair<Integer, Integer>> getCounters(Jedis conn, String name, int precision) {
+
+        return null;
     }
 
 
