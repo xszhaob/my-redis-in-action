@@ -7,6 +7,11 @@ import redis.clients.jedis.Transaction;
 import java.text.Collator;
 import java.text.SimpleDateFormat;
 import java.util.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * author:xszhaobo
@@ -28,7 +33,7 @@ public class Chapter05 {
     private static final Collator COLLATOR = Collator.getInstance();
 
     private static final SimpleDateFormat TIMESTAMP = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-    private static final SimpleDateFormat ISO_FORMAT = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:00");
+    private static final SimpleDateFormat ISO_FORMAT = new SimpleDateFormat("yyyy-MM-dd'T'HH:00:00");
 
     static {
         // 协调世界时，又称世界统一时间，世界标准时间，国际协调时间，简称UTC
@@ -63,6 +68,19 @@ public class Chapter05 {
             System.out.println(s);
         }
         System.out.println(conn.zscore("common:test:" + INFO, "this is test message " + 1));
+    }
+
+    @Test
+    public void testCounter() throws InterruptedException {
+        Jedis conn = new Jedis("localhost");
+        conn.select(0);
+        new CleanCounterTask().start(conn);
+        /*while (true) {
+            updateCounter(conn,"hit",1);
+            List<Pair<Integer, Integer>> hit = getCounters(conn, "hit", 5);
+            System.out.println(Arrays.toString(hit.toArray()));
+            Thread.sleep(3000);
+        }*/
     }
 
 
@@ -190,6 +208,10 @@ public class Chapter05 {
 
     // 精度
     private static final int[] PRECISION = new int[]{1, 5, 60, 300, 3600, 18000, 86400};
+    // 清理计数器旧数据的频率 CLEAN_INTERVAL秒一次
+    private static final int CLEAN_INTERVAL = 60;
+    // 清理次数
+    private static final AtomicInteger CLEAN_COUNT = new AtomicInteger();
 
     private void updateCounter(Jedis conn, String name, int count) {
         updateCounter(conn, name, count, System.currentTimeMillis() / 1000);
@@ -215,9 +237,10 @@ public class Chapter05 {
         Transaction trans = conn.multi();
         for (int i : PRECISION) {
             long pnow = (now / i) * i;
-            String hash = String.valueOf(pnow) + ":" + name;
+            String hash = String.valueOf(i) + ":" + name;
             // 把计数器记入“已有计数器”的有序集合，并将其分值设置为0，便于以后执行清理动作
             trans.zadd("known:", 0, hash);
+            System.out.println(hash);
             // 给定的计数器更新计数信息
             trans.hincrBy("count:" + hash, String.valueOf(pnow), count);
         }
@@ -261,5 +284,91 @@ public class Chapter05 {
         return resultList;
     }
 
+
+    /**
+     * 清理计数器旧数据的任务类
+     */
+    private class CleanCounterTask {
+        private ScheduledExecutorService executor = Executors.newScheduledThreadPool(Runtime.getRuntime().availableProcessors() * 2);
+
+        /**
+         * 每隔一分钟处理一次旧数据的定时任务
+         *
+         * @param conn redis连接
+         */
+        private void start(final Jedis conn) {
+            executor.scheduleWithFixedDelay(new Runnable() {
+                public void run() {
+                    try {
+                        System.out.println("执行清理动作。");
+                        cleanCounters(conn);
+                    } catch (Exception e) {
+                        if (e.getClass() == InterruptedException.class) {
+                            System.out.println("定时任务被中断");
+                            executor.shutdown();
+                        } else {
+                            System.out.println("定时任务执行发生异常：" + e.getMessage());
+                        }
+                    }
+                }
+            }, 0L, 1L, TimeUnit.SECONDS);
+        }
+
+        /**
+         * 停止清理计数器旧数据的定时任务
+         */
+        private void stop() {
+            executor.shutdown();
+        }
+
+        /**
+         * 清理旧的计数器
+         *
+         * @param conn redis连接
+         */
+        private void cleanCounters(Jedis conn) {
+            int cleanCount = CLEAN_COUNT.incrementAndGet();
+            // 获取所有的计数器
+            Set<String> counters = conn.zrange("known:", 0, -1);
+            System.out.println("****" + counters + "****");
+            // 处理每个计数器中旧有的数据
+            for (String counter : counters) {
+                for (int i : PRECISION) {
+                    if (needClean(i, cleanCount)) {
+                        List<Pair<Integer, Integer>> counterDataList = getCounters(conn, counter, i);
+                        if (counterDataList.size() > 5) {
+                            List<Pair<Integer, Integer>> cleanDataList = counterDataList.subList(120, counterDataList.size());
+                            // 为了保证在执行清理操作的同时会有其他的更新和插入操作，需要建立一个事务块来执行这个操作
+                            conn.watch("count:" + counter);
+                            for (Pair<Integer, Integer> pair : cleanDataList) {
+                                Transaction trans = conn.multi();
+                                conn.hdel("count:" + counter, pair.getKey() + "");
+                                List<Object> exec = trans.exec();
+                                System.out.println(Arrays.toString(exec.toArray()));
+                            }
+                        }
+                    }
+                    // 如果一个计数器在执行清理操作之后不再包含任何样本，
+                    // 那么程序将从记录已知计数器的有序集合里面移除这个计数器的引用信息
+                    if (conn.hgetAll("count:" + counter).isEmpty()) {
+                        conn.zrem("known:", counter);
+                    }
+                }
+            }
+        }
+
+
+        /**
+         * 根据时间精度和清理次数计算本次清理动作是否需要清理该精度的计数器旧数据
+         *
+         * @param precision  时间精度
+         * @param cleanCount 清理次数
+         * @return true如果需要清理，否则返回false
+         */
+        private boolean needClean(int precision, int cleanCount) {
+            return (precision <= CLEAN_INTERVAL) ||
+                    (precision > CLEAN_INTERVAL && cleanCount % (precision / CLEAN_INTERVAL) == 0);
+        }
+    }
 
 }
