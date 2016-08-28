@@ -6,10 +6,7 @@ import redis.clients.jedis.Transaction;
 
 import java.text.Collator;
 import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.List;
-import java.util.Set;
-import java.util.TimeZone;
+import java.util.*;
 
 /**
  * author:xszhaobo
@@ -191,6 +188,7 @@ public class Chapter05 {
         }
     }
 
+    // 精度
     private static final int[] PRECISION = new int[]{1, 5, 60, 300, 3600, 18000, 86400};
 
     private void updateCounter(Jedis conn, String name, int count) {
@@ -229,15 +227,38 @@ public class Chapter05 {
 
 
     /**
-     * 获取给定精度的计数器记录数据集
-     * @param conn
-     * @param name
-     * @param precision
-     * @return
+     * 获取给定精度的计数器记录数据集。
+     * 获取计数器数据并将其转换成整数，然后
+     * 根据时间的先后对转换后的数据进行排序。
+     *
+     * @param conn      redis连接
+     * @param name      计数器名称
+     * @param precision 精度
+     * @return 记录数据集
      */
     private List<Pair<Integer, Integer>> getCounters(Jedis conn, String name, int precision) {
-
-        return null;
+        // 计数器的名称
+        String hash = String.valueOf(precision) + ":" + name;
+        // 从redis中获取给定计数器数据集合
+        Map<String, String> stringStringMap = conn.hgetAll("count:" + hash);
+        // 组装计数器和数值，从String类型转换为Integer类型
+        List<Pair<Integer, Integer>> resultList = Collections.emptyList();
+        if (stringStringMap != null && !stringStringMap.isEmpty()) {
+            resultList = new ArrayList<Pair<Integer, Integer>>(stringStringMap.size());
+            for (Map.Entry<String, String> stringStringEntry : stringStringMap.entrySet()) {
+                resultList.add(new Pair<Integer, Integer>(
+                        Integer.parseInt(stringStringEntry.getKey()),
+                        Integer.parseInt(stringStringEntry.getValue())));
+            }
+        }
+        // 对数据进行排序，把旧的数据排在最前面
+        Collections.sort(resultList, new Comparator<Pair<Integer, Integer>>() {
+            public int compare(Pair<Integer, Integer> o1, Pair<Integer, Integer> o2) {
+                // 两个key代表的数据正负相同，可以这么写，如不相同不建议这么写
+                return o1.getKey() - o2.getKey();
+            }
+        });
+        return resultList;
     }
 
 
