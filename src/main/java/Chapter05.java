@@ -329,8 +329,9 @@ public class Chapter05 {
         private void cleanCounters(Jedis conn) {
             int cleanCount = CLEAN_COUNT.incrementAndGet();
             // 获取所有的计数器
+            System.out.println("********");
             Set<String> counters = conn.zrange("known:", 0, -1);
-            System.out.println("****" + counters + "****");
+            System.out.println("****" + Arrays.toString(counters.toArray()) + "****");
             // 处理每个计数器中旧有的数据
             for (String counter : counters) {
                 for (int i : PRECISION) {
