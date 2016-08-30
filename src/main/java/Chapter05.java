@@ -40,8 +40,20 @@ public class Chapter05 {
         ISO_FORMAT.setTimeZone(TimeZone.getTimeZone("UTC"));
     }
 
+    public static void main(String[] args) throws InterruptedException {
+        Jedis conn = new Jedis("localhost");
+        conn.select(0);
+        Chapter05 chapter05 = new Chapter05();
+        chapter05.new CleanCounterTask().start(conn);
+        while (true) {
+            chapter05.updateCounter(conn,"hit",1);
+            List<Pair<Integer, Integer>> hit = chapter05.getCounters(conn, "hit", 5);
+            System.out.println(Arrays.toString(hit.toArray()));
+            Thread.sleep(3000);
+        }
+    }
 
-    @Test
+
     public void testRecentLog() {
         Jedis conn = new Jedis("localhost");
         conn.select(15);
@@ -57,7 +69,6 @@ public class Chapter05 {
     }
 
 
-    @Test
     public void testCommonLog() {
         Jedis conn = new Jedis("localhost");
         conn.select(0);
@@ -70,7 +81,6 @@ public class Chapter05 {
         System.out.println(conn.zscore("common:test:" + INFO, "this is test message " + 1));
     }
 
-    @Test
     public void testCounter() throws InterruptedException {
         Jedis conn = new Jedis("localhost");
         conn.select(0);
@@ -240,7 +250,6 @@ public class Chapter05 {
             String hash = String.valueOf(i) + ":" + name;
             // 把计数器记入“已有计数器”的有序集合，并将其分值设置为0，便于以后执行清理动作
             trans.zadd("known:", 0, hash);
-            System.out.println(hash);
             // 给定的计数器更新计数信息
             trans.hincrBy("count:" + hash, String.valueOf(pnow), count);
         }
@@ -300,15 +309,13 @@ public class Chapter05 {
             executor.scheduleWithFixedDelay(new Runnable() {
                 public void run() {
                     try {
-                        System.out.println("执行清理动作。");
                         cleanCounters(conn);
                     } catch (Exception e) {
                         if (e.getClass() == InterruptedException.class) {
                             System.out.println("定时任务被中断");
                             executor.shutdown();
-                        } else {
-                            System.out.println("定时任务执行发生异常：" + e.getMessage());
                         }
+                        e.printStackTrace();
                     }
                 }
             }, 0L, 1L, TimeUnit.SECONDS);
@@ -329,23 +336,27 @@ public class Chapter05 {
         private void cleanCounters(Jedis conn) {
             int cleanCount = CLEAN_COUNT.incrementAndGet();
             // 获取所有的计数器
-            System.out.println("********");
             Set<String> counters = conn.zrange("known:", 0, -1);
-            System.out.println("****" + Arrays.toString(counters.toArray()) + "****");
+            System.out.println("***" + Arrays.toString(counters.toArray()) + "***");
             // 处理每个计数器中旧有的数据
             for (String counter : counters) {
                 for (int i : PRECISION) {
                     if (needClean(i, cleanCount)) {
-                        List<Pair<Integer, Integer>> counterDataList = getCounters(conn, counter, i);
+                        List<Pair<Integer, Integer>> counterDataList = getCounters(conn, counter.substring(counter.indexOf(":") + 1), i);
+                        System.out.println("counterDataList=" + Arrays.toString(counterDataList.toArray()));
                         if (counterDataList.size() > 5) {
-                            List<Pair<Integer, Integer>> cleanDataList = counterDataList.subList(120, counterDataList.size());
+                            List<Pair<Integer, Integer>> cleanDataList = counterDataList.subList(5, counterDataList.size());
                             // 为了保证在执行清理操作的同时会有其他的更新和插入操作，需要建立一个事务块来执行这个操作
                             conn.watch("count:" + counter);
                             for (Pair<Integer, Integer> pair : cleanDataList) {
                                 Transaction trans = conn.multi();
+                                /*
+                                此处一定要使用trans执行命令，如果使用conn执行命令，则会抛出异常。
+                                原因在于：使用trans执行命令，在trans调用exec时一起提交执行的一系列命令，
+                                如果直接使用conn执行命令，则会提示conn执行的命令没有在事务中。
+                                 */
                                 conn.hdel("count:" + counter, pair.getKey() + "");
-                                List<Object> exec = trans.exec();
-                                System.out.println(Arrays.toString(exec.toArray()));
+                                trans.exec();
                             }
                         }
                     }
