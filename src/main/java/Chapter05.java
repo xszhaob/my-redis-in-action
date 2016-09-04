@@ -434,14 +434,21 @@ public class Chapter05 {
 
 
                     String hkey = "count:" + hash;
+
+                    // 给定时间之后的将被保留
                     String cutoff = String.valueOf(
                             ((System.currentTimeMillis() + timeOffset) / 1000) - sampleCount * prec);
+                    // 获取给定计数器的所有数据
                     ArrayList<String> samples = new ArrayList<String>(conn.hkeys(hkey));
+                    // 按照时间排序
                     Collections.sort(samples);
+                    // 需要删除的下标
                     int remove = bisectRight(samples, cutoff);
 
                     if (remove != 0){
+                        // 删除给定key的哈希集合中给定哈希值
                         conn.hdel(hkey, samples.subList(0, remove).toArray(new String[0]));
+                        // 如果删除了旧值以后的计数器不再有数据，则删除该计数器
                         if (remove == samples.size()){
                             conn.watch(hkey);
                             if (conn.hlen(hkey) == 0) {
@@ -449,16 +456,22 @@ public class Chapter05 {
                                 trans.zrem("known:", hash);
                                 trans.exec();
                                 index--;
-                            }else{
+                            }
+                            // 如果有其他程序往集合中写入了数据，则不再删除该集合
+                            else{
                                 conn.unwatch();
                             }
                         }
                     }
                 }
 
+                // 为了让清理操作的执行频率与计数器更新的频率保持一致，
+                // 对记录循环次数的变量以及记录执行时长的变量进行更新
                 passes++;
                 long duration = Math.min(
                         (System.currentTimeMillis() + timeOffset) - start + 1000, 60000);
+                // 如果清理动作耗时超过60秒，则程序休息一秒钟再继续；
+                // 否则会在60秒余下的时间内进行休眠
                 try {
                     sleep(Math.max(60000 - duration, 1000));
                 }catch(InterruptedException ie){
