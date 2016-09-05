@@ -1,5 +1,4 @@
 import javafx.util.Pair;
-import org.junit.Test;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.Pipeline;
 import redis.clients.jedis.Transaction;
@@ -7,7 +6,6 @@ import redis.clients.jedis.Transaction;
 import java.text.Collator;
 import java.text.SimpleDateFormat;
 import java.util.*;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -42,14 +40,17 @@ public class Chapter05 {
 
     public static void main(String[] args) throws InterruptedException {
         Jedis conn = new Jedis("localhost");
+        Jedis conn1 = new Jedis("localhost");
         conn.select(0);
         Chapter05 chapter05 = new Chapter05();
-        chapter05.new CleanCounterTask().start(conn);
+        chapter05.new CleanCountersThreadTest(conn1,1000,10).start();
         while (true) {
             chapter05.updateCounter(conn,"hit",1);
-            List<Pair<Integer, Integer>> hit = chapter05.getCounters(conn, "hit", 5);
-            System.out.println(Arrays.toString(hit.toArray()));
-            Thread.sleep(3000);
+            for (int i : PRECISION) {
+                List<Pair<Integer, Integer>> hit = chapter05.getCounters(conn, "hit", i);
+                System.out.println("count:hit:" + i + "" + Arrays.toString(hit.toArray()));
+            }
+
         }
     }
 
@@ -384,106 +385,103 @@ public class Chapter05 {
     }
 
 
-    public class CleanCountersThread
-            extends Thread
-    {
+    private class CleanCountersThreadTest extends Thread {
         private Jedis conn;
+        // 未来的某个时间
+        private long timeOffset;
         // 要保留的计数数据量
         private int sampleCount = 100;
-        // 停止的标志
-        private boolean quit;
-        private long timeOffset; // used to mimic a time in the future.
+        // 停止运行的标志
+        private volatile boolean quite;
 
-        public CleanCountersThread(int sampleCount, long timeOffset){
-            this.conn = new Jedis("localhost");
-            this.conn.select(15);
-            this.sampleCount = sampleCount;
+        public CleanCountersThreadTest(Jedis conn, long timeOffset, int sampleCount) {
+            this.conn = conn;
+            conn.select(0);
             this.timeOffset = timeOffset;
+            this.sampleCount = sampleCount;
         }
 
-        public void quit(){
-            quit = true;
+        public void quite() {
+            this.quite = true;
         }
 
-        public void run(){
-            int passes = 0;
-            while (!quit){
-                long start = System.currentTimeMillis() + timeOffset;
+        @Override
+        public void run() {
+            int cleanCount = 0;
+            while (!quite) {
+                long start = (System.currentTimeMillis() + timeOffset);
                 int index = 0;
-                // zcard 返回有序集合key的基数
-                while (index < conn.zcard("known:")){
-                    // 获取偏移从index至index的成员，即只返回index下标的成员
-                    Set<String> hashSet = conn.zrange("known:", index, index);
+                // 遍历整个计数器
+                while (index < conn.zcard("known:")) {
+                    Set<String> counterSet = conn.zrange("known:", index, index);
                     index++;
-                    if (hashSet.size() == 0) {
+                    System.out.println("index=" + index);
+
+                    // 如果没有计数器，直接跳出对计数器遍历的循环
+                    if (counterSet == null || counterSet.isEmpty()) {
                         break;
                     }
-                    String hash = hashSet.iterator().next();
 
-                    // 一分钟以上的时间精度，如5分钟精度的计数器，则5分钟清理一次
-                    // 一分钟以内的时间精度计数器，一分钟清理一次
-                    int prec = Integer.parseInt(hash.substring(0, hash.indexOf(':')));
-                    int bprec = (int)Math.floor(prec / 60);
-                    if (bprec == 0){
-                        bprec = 1;
+                    // 计数器
+                    String hash = counterSet.iterator().next();
+                    System.out.println("计数器：" + hash);
+                    // 计数器的时间精度
+                    int pre = Integer.parseInt(hash.substring(0,hash.indexOf(":")));
+
+                    // 本次是否需要做清理
+                    int bPre =  (int) Math.floor(pre / 60);
+                    // 时间精度在一分钟之内
+                    if (bPre == 0) {
+                        bPre = 1;
                     }
-                    if ((passes % bprec) != 0){
+                    if (cleanCount % bPre != 0) {
                         continue;
                     }
 
-
-
-                    String hkey = "count:" + hash;
-
-                    // 给定时间之后的将被保留
-                    String cutoff = String.valueOf(
-                            ((System.currentTimeMillis() + timeOffset) / 1000) - sampleCount * prec);
-                    // 获取给定计数器的所有数据
-                    ArrayList<String> samples = new ArrayList<String>(conn.hkeys(hkey));
-                    // 按照时间排序
-                    Collections.sort(samples);
-                    // 需要删除的下标
-                    int remove = bisectRight(samples, cutoff);
-
-                    if (remove != 0){
-                        // 删除给定key的哈希集合中给定哈希值
-                        conn.hdel(hkey, samples.subList(0, remove).toArray(new String[0]));
-                        // 如果删除了旧值以后的计数器不再有数据，则删除该计数器
-                        if (remove == samples.size()){
-                            conn.watch(hkey);
-                            if (conn.hlen(hkey) == 0) {
-                                Transaction trans = conn.multi();
-                                trans.zrem("known:", hash);
-                                trans.exec();
-                                index--;
-                            }
-                            // 如果有其他程序往集合中写入了数据，则不再删除该集合
-                            else{
-                                conn.unwatch();
+                    String hashKey = "count:" + hash;
+                    String countOff = String.valueOf((System.currentTimeMillis() + timeOffset) / 1000 - sampleCount * pre);
+                    List<String> dataList = new ArrayList<String>(conn.hkeys(hashKey));
+                    if (!dataList.isEmpty()) {
+                        System.out.println("hashKey:" + hashKey + "===>dataList" + Arrays.toString(dataList.toArray()));
+                        System.out.println("countOff" + countOff);
+                        // 首先对list进行排序，然后才能使用Collections提供的二分法搜索
+                        Collections.sort(dataList);
+                        // Collections的二分查询这是精妙
+                        int removeIndex = Collections.binarySearch(dataList,countOff);
+                        removeIndex = removeIndex < 0 ? Math.abs(removeIndex) - 1 : removeIndex;
+                        System.out.println("removeIndex" + removeIndex);
+                        if (removeIndex > 0) {
+                            conn.hdel(hashKey,dataList.subList(0,removeIndex).toArray(new String[0]));
+                            if (removeIndex == dataList.size()) {
+                                conn.watch(hashKey);
+                        /*
+                        使用hlen而不要使用hkeys，
+                        我们只需要知道有多少条数据即可，
+                        使用hlen可以较少数据传输带来的消耗
+                         */
+//                        if (conn.hkeys(hashKey).isEmpty()) {
+                                if (conn.hlen(hashKey) == 0) {
+                                    Transaction trans = conn.multi();
+                                    trans.zrem("known:",hash);
+                                    trans.exec();
+                                    index--;
+                                } else {
+                                    conn.unwatch();
+                                }
                             }
                         }
+
                     }
                 }
 
-                // 为了让清理操作的执行频率与计数器更新的频率保持一致，
-                // 对记录循环次数的变量以及记录执行时长的变量进行更新
-                passes++;
-                long duration = Math.min(
-                        (System.currentTimeMillis() + timeOffset) - start + 1000, 60000);
-                // 如果清理动作耗时超过60秒，则程序休息一秒钟再继续；
-                // 否则会在60秒余下的时间内进行休眠
+                cleanCount++;
+                long duration = Math.min((System.currentTimeMillis() + timeOffset) - start + 1000,60000);
                 try {
-                    sleep(Math.max(60000 - duration, 1000));
-                }catch(InterruptedException ie){
+                    sleep(Math.max(60000 - duration,1000));
+                } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                 }
             }
-        }
-
-        // mimic python's bisect.bisect_right
-        public int bisectRight(List<String> values, String key) {
-            int index = Collections.binarySearch(values, key);
-            return index < 0 ? Math.abs(index) - 1 : index + 1;
         }
     }
 
