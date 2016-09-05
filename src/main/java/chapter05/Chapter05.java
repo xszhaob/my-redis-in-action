@@ -1,3 +1,5 @@
+package chapter05;
+
 import javafx.util.Pair;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.Pipeline;
@@ -22,16 +24,16 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 public class Chapter05 {
     // 日志级别
-    private static final String DEBUG = "debug";
-    private static final String INFO = "info";
-    private static final String WARNING = "warning";
-    private static final String ERROR = "error";
-    private static final String CRITICAL = "critical";
+    static final String DEBUG = "debug";
+    static final String INFO = "info";
+    static final String WARNING = "warning";
+    static final String ERROR = "error";
+    static final String CRITICAL = "critical";
 
-    private static final Collator COLLATOR = Collator.getInstance();
+    static final Collator COLLATOR = Collator.getInstance();
 
-    private static final SimpleDateFormat TIMESTAMP = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-    private static final SimpleDateFormat ISO_FORMAT = new SimpleDateFormat("yyyy-MM-dd'T'HH:00:00");
+    static final SimpleDateFormat TIMESTAMP = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+    static final SimpleDateFormat ISO_FORMAT = new SimpleDateFormat("yyyy-MM-dd'T'HH:00:00");
 
     static {
         // 协调世界时，又称世界统一时间，世界标准时间，国际协调时间，简称UTC
