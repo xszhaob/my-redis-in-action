@@ -452,6 +452,7 @@ public class Chapter05 {
                         System.out.println("removeIndex" + removeIndex);
                         if (removeIndex > 0) {
                             conn.hdel(hashKey,dataList.subList(0,removeIndex).toArray(new String[0]));
+                            // 如果散列集合被清空，那么把对应计数器在对应的计数器有序集合中删除
                             if (removeIndex == dataList.size()) {
                                 conn.watch(hashKey);
                         /*
