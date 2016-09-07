@@ -30,6 +30,33 @@ public class UpdateStats {
         }
     }
 
+    /**
+     * 存储统计数据的方法。
+     * 统计数据使用的redis存储结构：有序集合
+     * <p/>
+     * 统计程序在写入数据之前会进行检查，
+     * 确保被记录的是当前这一个小时的统计数据，
+     * 并且将不属于当前这一小时的旧数据归档。
+     * 此后，程序会构建两个临时有序集合，
+     * 其中一个用于保存最小值，另一个则用于保存最大值。
+     * 然后使用ZUNIONSTORE命令以及它的两个聚合函数
+     * MIN和MAX，分别计算两个临时集合和当前统计数据集合
+     * 之间的并集，最终获取当前的最大值和最小值。
+     * 通过使用ZUNIONSTORE命令，程序可以快速地更新数据
+     * 并且不需要使用WATCH监视可能会频繁更新的存储统计数据的键。
+     * 在并集计算完成之后，删掉临时集合，并使用ZINCRBY对应统计数据中的
+     * count、sum、sumsq三个成员进行更新。
+     *
+     * @param conn    redis连接
+     * @param context 上下文
+     * @param type    类型
+     * @param value   统计数据值
+     * @param timeOut 每次存储统计数据限定的超时时间（毫秒）
+     * @return list或null
+     * list.get(0) = 统计数据的总条数
+     * list.get(1) = 统计数据值的总和
+     * list.get(2) = 统计数据值的平方和
+     */
     private List<Object> updateStats(Jedis conn, String context, String type, int value, long timeOut) {
         String zKey = "stats:" + context + ":" + type;
         String startKey = zKey + ":start";
@@ -66,11 +93,11 @@ public class UpdateStats {
                     zKey, tempKeyMin);
             // 删除两个临时key
             trans.del(tempKeyMax, tempKeyMin);
-            // 总数加1
+            // 总数加1，并且把总数返回
             trans.zincrby(zKey, 1, "count");
-            // 和加上本次值
+            // 和加上本次值，并且把总和返回
             trans.zincrby(zKey, value, "sum");
-            // 平方和加上本次值
+            // 平方和加上本次值，返回平方和
             trans.zincrby(zKey, value * value, "sumsq");
 
             List<Object> exec = trans.exec();
