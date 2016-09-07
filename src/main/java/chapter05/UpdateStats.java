@@ -79,7 +79,7 @@ public class UpdateStats {
             String tempKeyMin = UUID.randomUUID().toString();
 
             trans.zadd(tempKeyMax, value, "max");
-            trans.zadd(tempKeyMax, value, "min");
+            trans.zadd(tempKeyMin, value, "min");
 
             // 获取并集，并且分值以最大、最小的为准
             /*
@@ -105,7 +105,6 @@ public class UpdateStats {
             if (exec == null) {
                 continue;
             }
-            System.out.println(conn.get(startKey));
             return exec.subList(exec.size() - 3, exec.size());
         }
         return null;
