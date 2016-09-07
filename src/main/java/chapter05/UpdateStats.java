@@ -3,11 +3,10 @@ package chapter05;
 import org.junit.Test;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.Transaction;
+import redis.clients.jedis.Tuple;
 import redis.clients.jedis.ZParams;
 
-import java.util.Date;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 
 /**
  * author:xszhaobo
@@ -108,5 +107,31 @@ public class UpdateStats {
             return exec.subList(exec.size() - 3, exec.size());
         }
         return null;
+    }
+
+    /**
+     * 获取给定上下文和类型的统计数据的信息。
+     * 包括最大值、最小值、值的总和、数据总数量、平方和、平均数、标准差。
+     *
+     * @param conn    redis连接
+     * @param context 上下文
+     * @param type    统计数据类型
+     * @return 标准差
+     */
+    private Map<String, Double> getStats(Jedis conn, String context, String type) {
+        String zKey = "stats:" + context + ":" + type;
+        Set<Tuple> tupleSet = conn.zrangeWithScores(zKey, 0, -1);
+        if (tupleSet == null || tupleSet.isEmpty()) {
+            return null;
+        }
+        Map<String, Double> result = new HashMap<String, Double>(tupleSet.size());
+        for (Tuple tuple : tupleSet) {
+            result.put(tuple.getElement(), tuple.getScore());
+        }
+        result.put("average", result.get("sum") / result.get("count"));
+        double numerator = result.get("sumsq") - Math.pow(result.get("sum"), 2) / result.get("count");
+        double count = result.get("count");
+        result.put("stddev", Math.pow(numerator / (count > 1 ? count - 1 : 1), .5));
+        return result;
     }
 }
