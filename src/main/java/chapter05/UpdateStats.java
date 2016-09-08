@@ -23,10 +23,17 @@ public class UpdateStats {
     public void testUpdateStats() {
         Jedis conn = new Jedis("localhost");
         conn.select(15);
-        UpdateStats updateStats = new UpdateStats();
         for (int i = 0; i < 100; i++) {
-            updateStats.updateStats(conn, "hit", "counter", i, 1000);
+            updateStats(conn, "hit", "counter", i, 1000);
         }
+    }
+
+    @Test
+    public void testGetStats() {
+        Jedis conn = new Jedis("localhost");
+        conn.select(15);
+        Map<String, Double> stats = getStats(conn, "hit", "counter");
+        System.out.println(stats);
     }
 
     /**
@@ -116,7 +123,7 @@ public class UpdateStats {
      * @param conn    redis连接
      * @param context 上下文
      * @param type    统计数据类型
-     * @return 标准差
+     * @return Map集合，包括最大值、最小值、值的总和、数据总数量、平方和、平均数、标准差
      */
     private Map<String, Double> getStats(Jedis conn, String context, String type) {
         String zKey = "stats:" + context + ":" + type;
