@@ -5,6 +5,7 @@ import redis.clients.jedis.Jedis;
 import redis.clients.jedis.Transaction;
 import redis.clients.jedis.Tuple;
 import redis.clients.jedis.ZParams;
+import redis.clients.jedis.exceptions.InvalidURIException;
 
 import java.util.*;
 
@@ -63,7 +64,7 @@ public class UpdateStats {
      * list.get(1) = 统计数据值的总和
      * list.get(2) = 统计数据值的平方和
      */
-    private List<Object> updateStats(Jedis conn, String context, String type, int value, long timeOut) {
+    public List<Long> updateStats(Jedis conn, String context, String type, int value, long timeOut) {
         String zKey = "stats:" + context + ":" + type;
         String startKey = zKey + ":start";
         String start = Chapter05.ISO_FORMAT.format(new Date());
@@ -111,7 +112,12 @@ public class UpdateStats {
             if (exec == null) {
                 continue;
             }
-            return exec.subList(exec.size() - 3, exec.size());
+            List<Object> objects = exec.subList(exec.size() - 3, exec.size());
+            List<Long> result = new ArrayList<Long>(objects.size());
+            for (Object object : objects) {
+                result.add(Long.parseLong(object.toString()));
+            }
+            return result;
         }
         return null;
     }
