@@ -25,26 +25,31 @@ public class AccessTime {
         Jedis conn = new Jedis("localhost");
         conn.select(15);
         for (int i = 0; i < 1000; i++) {
-            accessTime(conn,UUID.randomUUID().toString());
+            accessTime(conn, UUID.randomUUID().toString());
         }
     }
 
-
-    private void accessTime(Jedis conn,String context) {
+    /**
+     * 统计访问时间的方法
+     *
+     * @param conn jedis连接
+     * @param context 上下文
+     */
+    private void accessTime(Jedis conn, String context) {
         long start = System.currentTimeMillis();
         processSomething();
         long timeConsuming = System.currentTimeMillis() - start;
 
         List<Long> stats = new UpdateStats().updateStats(conn, context, "accessTime", (int) timeConsuming, 1000);
-        long average = stats.get(1)/stats.get(0);
+        long average = stats.get(1) / stats.get(0);
         Transaction trans = conn.multi();
-        trans.zadd("slowest:accessTime",average,context);
-        trans.zremrangeByRank("slowest:accessTime",0,-101);
+        trans.zadd("slowest:accessTime", average, context);
+        trans.zremrangeByRank("slowest:accessTime", 0, -101);
         // 执行事务模块中的命令
         trans.exec();
     }
 
-    // 模拟处理事务
+    // 模拟处理请求的方法
     private void processSomething() {
         System.out.println("process something.");
         try {
