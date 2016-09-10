@@ -7,6 +7,7 @@ import redis.clients.jedis.Tuple;
 import redis.clients.jedis.ZParams;
 import redis.clients.jedis.exceptions.InvalidURIException;
 
+import java.math.BigDecimal;
 import java.util.*;
 
 /**
@@ -115,7 +116,8 @@ public class UpdateStats {
             List<Object> objects = exec.subList(exec.size() - 3, exec.size());
             List<Long> result = new ArrayList<Long>(objects.size());
             for (Object object : objects) {
-                result.add(Long.parseLong(object.toString()));
+                // 执行命令后返回的结果是double类型，转为int
+                result.add(new BigDecimal(object.toString()).longValue());
             }
             return result;
         }
