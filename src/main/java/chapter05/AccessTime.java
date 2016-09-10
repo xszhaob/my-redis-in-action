@@ -1,9 +1,12 @@
 package chapter05;
 
+import org.junit.Test;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.Transaction;
 
 import java.util.List;
+import java.util.Random;
+import java.util.UUID;
 
 /**
  * author:xszhaobo
@@ -17,6 +20,15 @@ import java.util.List;
  */
 public class AccessTime {
 
+    @Test
+    public void accessTimeTest() {
+        Jedis conn = new Jedis("localhost");
+        conn.select(15);
+        for (int i = 0; i < 1000; i++) {
+            accessTime(conn,UUID.randomUUID().toString());
+        }
+    }
+
 
     private void accessTime(Jedis conn,String context) {
         long start = System.currentTimeMillis();
@@ -28,13 +40,16 @@ public class AccessTime {
         Transaction trans = conn.multi();
         trans.zadd("slowest:accessTime",average,context);
         trans.zremrangeByRank("slowest:accessTime",0,-101);
+        // 执行事务模块中的命令
+        trans.exec();
     }
 
-
+    // 模拟处理事务
     private void processSomething() {
         System.out.println("process something.");
         try {
-            Thread.sleep(10000);
+            Random random = new Random();
+            Thread.sleep(random.nextInt(1000));
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
