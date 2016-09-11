@@ -24,6 +24,8 @@ public class ConfigInRedis {
     private Map<String, String> configCache = new HashMap<String, String>();
     private long lastConfig;
 
+    private Map<String, Jedis> connectionCache = new HashMap<String, Jedis>();
+
 
     /**
      * 返回服务器是否正在维护。
@@ -78,5 +80,25 @@ public class ConfigInRedis {
             lastConfig = System.currentTimeMillis();
         }
         return result;
+    }
+
+
+    private Jedis redisConnection(String serverName) {
+        Jedis conn = connectionCache.get("connect");
+        if (conn == null) {
+            conn = new Jedis("localhost");
+            conn.select(15);
+            connectionCache.put("connect", conn);
+        }
+
+        String key = "config:redis:" + serverName;
+        String oldConfig = configCache.get(key);
+        String config = getConfig(conn, "redis", serverName);
+        if (!oldConfig.equals(config)) {
+            Jedis redisConn = new Jedis("localhost");
+            if (config.contains("db")) {
+            }
+        }
+        return connectionCache.get(key);
     }
 }
