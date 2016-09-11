@@ -2,7 +2,6 @@ package chapter05;
 
 import redis.clients.jedis.Jedis;
 
-import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -18,12 +17,12 @@ import java.util.Map;
  * 使用redis存储服务器的配置信息
  */
 public class ConfigInRedis {
-    private Date lastCheck;
+    private long lastCheck;
     private boolean isUnderMain = false;
     private static final String IS_UNDER_MAINTENANCE_KEY = "isUnderMaintenance";
 
     private Map<String, String> configCache = new HashMap<String, String>();
-    private Date lastConfig;
+    private long lastConfig;
 
 
     /**
@@ -40,10 +39,9 @@ public class ConfigInRedis {
      * @return true如果服务器正在维护中，否则返回false
      */
     private boolean isUnderMaintenance(Jedis conn) {
-        Date now = new Date();
-        if (lastCheck == null || (now.getTime() - lastCheck.getTime()) > 1000) {
+        if (lastCheck == 0 || (System.currentTimeMillis() - lastCheck) > 1000) {
             isUnderMain = conn.get(IS_UNDER_MAINTENANCE_KEY) != null;
-            lastCheck = now;
+            lastCheck = System.currentTimeMillis();
         }
         return isUnderMain;
     }
@@ -74,11 +72,10 @@ public class ConfigInRedis {
     private String getConfig(Jedis conn, String type, String serverName) {
         String key = "config:" + type + ":" + serverName;
         String result = configCache.get(key);
-        Date now = new Date();
-        if (result == null || lastConfig == null || (now.getTime() - lastConfig.getTime()) > 1000) {
+        if (result == null || lastConfig == 0 || (System.currentTimeMillis() - lastConfig) > 1000) {
             result = conn.get(key);
             configCache.put(key, result);
-            lastConfig = new Date();
+            lastConfig = System.currentTimeMillis();
         }
         return result;
     }
