@@ -1,11 +1,12 @@
 package chapter06;
 
+import org.junit.Test;
 import redis.clients.jedis.Jedis;
-import redis.clients.jedis.Pipeline;
 import redis.clients.jedis.Transaction;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 
 /**
  * author:xszhaobo
@@ -22,6 +23,34 @@ import java.util.List;
  * 使用列表是因为列表占用的内存是最少的。
  */
 public class AutoComplete {
+
+
+    @Test
+    public void testAutoComplete() {
+        Jedis conn = new Jedis("localhost");
+        conn.select(0);
+        List<String> list = new ArrayList<String>();
+        list.add("jack");
+        list.add("lily");
+        list.add("lucy");
+        list.add("jim");
+        list.add("tom");
+        list.add("java");
+        list.add("c");
+        list.add("python");
+        list.add("jack");
+        Random random = new Random();
+        for (int i = 0; i < 500; i++) {
+            String contact = list.get(random.nextInt(9));
+            if (i == 450) {
+                contact = "jack";
+            }
+            addAndUpdateContact(conn,"bo.zhao",contact + i);
+        }
+        delContact(conn,"bo.zhao","jack" + 450);
+        List<String> contactList = fetchAutocompleteList(conn,"bo.zhao","t");
+        System.out.println(contactList);
+    }
 
     /**
      * 操作就是添加或更新一个联系人，让他成为最新的被
