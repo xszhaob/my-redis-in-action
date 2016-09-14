@@ -2,6 +2,8 @@ package chapter06.lock;
 
 import org.junit.Test;
 import redis.clients.jedis.Jedis;
+import redis.clients.jedis.Response;
+import redis.clients.jedis.Transaction;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -43,9 +45,10 @@ public class SimpleLock {
                     }
                     for (int i1 = 0; i1 < 10; i1++) {
                         long start = System.currentTimeMillis();
-                        if (acquireLock(conn,"aLock",100)) {
+                        String aLock = acquireLock(conn, "aLock", 100);
+                        if (aLock != null) {
                             countList.add(System.currentTimeMillis() - start);
-                            releaseLock(conn,"aLock",100);
+                            releaseLock(conn, "aLock", aLock, 100);
                         } else {
                             acquireFailCount.incrementAndGet();
                         }
@@ -71,20 +74,23 @@ public class SimpleLock {
      * @param conn     redis连接
      * @param lockName 锁名称
      * @param timeOut  超时时间
-     * @return true如果获取锁，否则返回false
+     * @return 如果获取锁成功则返回锁键对应的值，否则返回null
      */
-    private boolean acquireLock(Jedis conn, String lockName, long timeOut) {
+    private String acquireLock(Jedis conn, String lockName, long timeOut) {
         String lockKey = "lock:" + lockName;
         String uuid = UUID.randomUUID().toString();
         long end = System.currentTimeMillis() + timeOut;
         while (System.currentTimeMillis() < end) {
-            Long result = conn.setnx(lockKey, uuid);
-            if (result == 1) {
-                conn.expire(lockKey, 10);
-                return true;
+            if (conn.setnx(lockKey, uuid) == 1) {
+                return uuid;
+            }
+            try {
+                Thread.sleep(1);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
             }
         }
-        return false;
+        return null;
     }
 
     /**
@@ -95,16 +101,22 @@ public class SimpleLock {
      * @param timeOut  超时时间
      * @return true如果释放锁，否则返回false
      */
-    private boolean releaseLock(Jedis conn, String lockName, long timeOut) {
+    private boolean releaseLock(Jedis conn, String lockName,String lockId, long timeOut) {
         String lockKey = "lock:" + lockName;
         long end = System.currentTimeMillis() + timeOut;
         while (System.currentTimeMillis() < end) {
-            Long result = conn.del(lockKey);
-            if (result == 1) {
+            conn.watch(lockKey);
+            if (lockId.equals(conn.get(lockKey))) {
+                Transaction trans = conn.multi();
+                Response<Long> del = trans.del(lockKey);
+                if (del == null) {
+                    continue;
+                }
                 return true;
             }
+            conn.unwatch();
+            break;
         }
-        conn.expire(lockKey,1);
         return false;
     }
 }
