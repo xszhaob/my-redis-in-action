@@ -31,12 +31,14 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class BetterLock {
     @Test
     public void stats_lock() {
-//        for (int i = 1; i < 100; i++) {
-            test(5);
-//        }
+        test(5);
     }
 
-
+    /**
+     * 分布式锁的测试方法
+     *
+     * @param threads 模拟获取锁的请求线程数
+     */
     public void test(int threads) {
         final AtomicInteger acquireFailCount = new AtomicInteger();
         final AtomicInteger acquireCount = new AtomicInteger();
@@ -73,7 +75,8 @@ public class BetterLock {
         latch.countDown();
         try {
             endLatch.await();
-        } catch (InterruptedException ignore) {}
+        } catch (InterruptedException ignore) {
+        }
         executorService.shutdown();
         long count = 0;
         for (Long aLong : countList) {
@@ -89,7 +92,7 @@ public class BetterLock {
      * 1.如果获取锁成功，会设置锁的生存时间；
      * 2.虽然大多数情况下redis的锁都有生存时间，
      * 但是为了防止在上锁后、设置锁的生存周期
-     * 之前redis崩溃了。我们加入如下判断：
+     * 之前获取锁的方法出现了异常而终止。我们加入如下判断：
      * 如果获取锁失败，会检查已存在锁是否设置有生存时间，
      * 如果没有设置生存时间，那么会给锁设置生存时间。
      * 。
