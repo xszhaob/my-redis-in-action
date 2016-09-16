@@ -8,6 +8,7 @@ import redis.clients.jedis.Transaction;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.Vector;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -31,7 +32,7 @@ public class SimpleLock {
 
         final CountDownLatch latch = new CountDownLatch(0);
         final CountDownLatch endLatch = new CountDownLatch(100);
-        final List<Long> countList = new ArrayList<Long>();
+        final List<Long> countList = new Vector<Long>();
         ExecutorService executorService = Executors.newFixedThreadPool(100);
         for (int i = 0; i < 100; i++) {
             executorService.execute(new Runnable() {

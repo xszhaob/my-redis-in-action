@@ -1,10 +1,17 @@
 package chapter06.semaphore;
 
+import org.junit.Test;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.Transaction;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.Vector;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * author:xszhaobo
@@ -17,6 +24,62 @@ import java.util.UUID;
  * 利用redis实现一个简单的信号量
  */
 public class BaseSemaphore {
+
+    @Test
+    public void stats_lock() {
+        test(50);
+    }
+
+    /**
+     * 分布式锁的测试方法
+     *
+     * @param threads 模拟获取锁的请求线程数
+     */
+    public void test(int threads) {
+        final AtomicInteger acquireFailCount = new AtomicInteger();
+        final AtomicInteger acquireCount = new AtomicInteger();
+
+        final CountDownLatch latch = new CountDownLatch(0);
+        final CountDownLatch endLatch = new CountDownLatch(threads);
+        final List<Long> countList = new Vector<Long>();
+        ExecutorService executorService = Executors.newFixedThreadPool(threads);
+        for (int i = 0; i < threads; i++) {
+            executorService.execute(new Runnable() {
+                public void run() {
+                    final Jedis conn = new Jedis("localhost");
+                    conn.select(0);
+                    try {
+                        latch.await();
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                    for (int i1 = 0; i1 < 50; i1++) {
+                        long start = System.currentTimeMillis();
+                        acquireCount.incrementAndGet();
+                        String aLock = acquireSemaphore(conn, "aSem", 5, 1);
+                        if (aLock != null) {
+                            countList.add(System.currentTimeMillis() - start);
+                            releaseSemaphore(conn, "aSem", aLock);
+                        } else {
+                            acquireFailCount.incrementAndGet();
+                        }
+                    }
+                    endLatch.countDown();
+                }
+            });
+        }
+        latch.countDown();
+        try {
+            endLatch.await();
+        } catch (InterruptedException ignore) {
+        }
+        executorService.shutdown();
+        long count = 0;
+        for (Long aLong : countList) {
+                count += aLong;
+        }
+        System.out.println("并发量：" + threads + "，尝试获取信号量" + acquireCount + "次，其中成功" + (acquireCount.get() - acquireFailCount.get()) + "次，获取锁平均耗时" + (count / (double) countList.size()) + "毫秒。");
+    }
 
     /**
      * 获取一个信号量
