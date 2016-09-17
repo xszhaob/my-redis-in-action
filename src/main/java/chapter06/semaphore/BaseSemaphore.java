@@ -4,7 +4,6 @@ import org.junit.Test;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.Transaction;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.Vector;
@@ -21,7 +20,14 @@ import java.util.concurrent.atomic.AtomicInteger;
  * package_name:chapter06.semaphore
  * <p/>
  * project: my-redis-in-action
- * 利用redis实现一个简单的信号量
+ * 利用redis实现一个简单的信号量，
+ * 这个基本的信号量可以两个良好地工作。
+ * 但是存在一个问题：它在获取信号量的时候，
+ * 会假设每个服务访问到的系统时间都是相同的，
+ * 而在不同的主机中可能并非如此。
+ * 举个例子，对于系统A和B来说，假如A的系统时间比B的系统时间快10毫秒，
+ * 那么当A获取了最后一个信号量时，B只需要在10毫秒内获取信号量，
+ * 就可以在A不知情的情况下“偷走”A已经获取的信号量。
  */
 public class BaseSemaphore {
 
