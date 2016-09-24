@@ -1,8 +1,8 @@
 import org.junit.Test;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.Set;
 
 /**
  * author:xszhaobo
@@ -16,18 +16,19 @@ import java.util.List;
 public class CollectionsTest {
     @Test
     public void binarySearch() {
-        List<Integer> intList = new ArrayList<Integer>();
+        Set<Integer> intList = new HashSet<Integer>();
         intList.add(1);
         intList.add(2);
         intList.add(3);
         intList.add(5);
         intList.add(6);
         intList.add(7);
-        Collections.sort(intList);
-        System.out.println(intList.subList(0,0));
-
-        int pre = 5;
-        int bPre =  (int) Math.floor(pre / 60);
-        System.out.println(bPre);
+        for (Integer integer : intList) {
+            System.out.println(integer);
+        }
+        Iterator<Integer> iterator = intList.iterator();
+        while (iterator.hasNext()) {
+            System.out.println(iterator.next());
+        }
     }
 }
