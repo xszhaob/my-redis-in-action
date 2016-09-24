@@ -31,7 +31,7 @@ public class Chat {
      * @param message    消息
      * @param chatId     聊天组id
      */
-    private void createChat(Jedis conn, String sender, Set<String> recipients, String message, String chatId) {
+    public void createChat(Jedis conn, String sender, Set<String> recipients, String message, String chatId) {
         chatId = chatId == null ? conn.incr("ids:chat:").toString() : chatId;
         recipients.add(sender);
 
@@ -53,7 +53,7 @@ public class Chat {
      * @param sender  发送者
      * @param message 消息
      */
-    private void sendMessage(Jedis conn, String chatId, String sender, String message) {
+    public void sendMessage(Jedis conn, String chatId, String sender, String message) {
         BetterLock lock = new BetterLock();
         String lockId = lock.acquireLockWithTimeOut(conn, "chat:lock:" + chatId, 100, 3);
         if (lockId == null) {
