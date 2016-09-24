@@ -104,7 +104,7 @@ public class BetterLock {
      * @param lockTimeOut 锁的生存时间（秒）
      * @return 如果获取锁成功则返回锁键对应值，否则返回null
      */
-    private String acquireLockWithTimeOut(Jedis conn, String lockName, long waitTimeOut, int lockTimeOut) {
+    public String acquireLockWithTimeOut(Jedis conn, String lockName, long waitTimeOut, int lockTimeOut) {
         String lockKey = "lock:" + lockName;
         String lockId = UUID.randomUUID().toString();
         long end = System.currentTimeMillis() + waitTimeOut;
@@ -138,7 +138,7 @@ public class BetterLock {
      * @param waiteTimeOut 解锁动作的超时时间（毫秒）
      * @return true如果解锁成功，否则返回false
      */
-    private boolean releaseLock(Jedis conn, String lockName, String lockId, long waiteTimeOut) {
+    public boolean releaseLock(Jedis conn, String lockName, String lockId, long waiteTimeOut) {
         String lockKey = "lock:" + lockName;
         long end = System.currentTimeMillis() + waiteTimeOut;
         int i = 0;
