@@ -31,7 +31,7 @@ public class Chat {
      * @param message    消息
      * @param chatId     聊天组id
      */
-    public void createChat(Jedis conn, String sender, Set<String> recipients, String message, String chatId) {
+    public String createChat(Jedis conn, String sender, Set<String> recipients, String message, String chatId) {
         chatId = chatId == null ? conn.incr("ids:chat:").toString() : chatId;
         recipients.add(sender);
 
@@ -43,6 +43,8 @@ public class Chat {
             trans.zadd("seen:" + recipient, 0, chatId);
         }
         trans.exec();
+
+        return sendMessage(conn,chatId,sender,message);
     }
 
     /**
@@ -53,7 +55,7 @@ public class Chat {
      * @param sender  发送者
      * @param message 消息
      */
-    public void sendMessage(Jedis conn, String chatId, String sender, String message) {
+    public String sendMessage(Jedis conn, String chatId, String sender, String message) {
         BetterLock lock = new BetterLock();
         String lockId = lock.acquireLockWithTimeOut(conn, "chat:lock:" + chatId, 100, 3);
         if (lockId == null) {
@@ -68,11 +70,13 @@ public class Chat {
             map.put("message", message);
             String msg = new ObjectMapper().writeValueAsString(map);
             conn.zadd("msgs:" + chatId, messageId, msg);
+            return chatId;
         } catch (JsonProcessingException e) {
             e.printStackTrace();
         } finally {
             lock.releaseLock(conn, "chat:lock:" + chatId, lockId, 100);
         }
+        return null;
     }
 
     @SuppressWarnings("unchecked")
