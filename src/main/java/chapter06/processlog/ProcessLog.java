@@ -121,6 +121,14 @@ public class ProcessLog {
 
 
         private long clean(Deque<File> waiting, int count) {
+            if (waiting == null || waiting.isEmpty()) {
+                return 0;
+            }
+            File firstFile = waiting.getFirst();
+            if (String.valueOf(count).equals(conn.get(channel + firstFile + ":done"))) {
+                conn.del(channel + firstFile,channel + firstFile + ":done");
+                return waiting.removeFirst().length();
+            }
             return 0;
         }
     }
