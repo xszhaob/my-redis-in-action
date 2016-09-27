@@ -18,6 +18,9 @@ import java.util.*;
 public class ProcessLog {
 
 
+    /**
+     * 将给定文件存储到redis中
+     */
     public class CopyLogsThread extends Thread {
         private Jedis conn;
         private File path;
@@ -46,8 +49,10 @@ public class ProcessLog {
             for (int i = 0; i < count; i++) {
                 recipients.add(String.valueOf(i));
             }
+            // conn sender 聊天组成员 信息 chatId
             chat.createChat(conn, "source", recipients, "", channel);
 
+            // FilenameFilter 实现此接口的类实例可用于过滤器文件名
             File[] files = path.listFiles(new FilenameFilter() {
                 public boolean accept(File dir, String name) {
                     return name.startsWith("temp_redis");
@@ -82,7 +87,7 @@ public class ProcessLog {
                             bytes = new byte[readBytes];
                             System.arraycopy(buffer, 0, bytes, 0, readBytes);
                         }
-                        conn.append((channel + logFile).getBytes(),bytes);
+                        conn.append((channel + logFile).getBytes(), bytes);
                     }
                 } catch (IOException e) {
                     e.printStackTrace();
@@ -96,17 +101,20 @@ public class ProcessLog {
                     }
                 }
 
-                chat.sendMessage(conn,channel,"source",logFile.toString());
+                // 提醒监听者，文件已准备就绪
+                chat.sendMessage(conn, channel, "source", logFile.toString());
 
                 bytesInRedis += fileSize;
                 waiting.add(logFile);
 
             }
 
-            chat.sendMessage(conn,channel,"source",":done");
+            // 所有文件已经处理完毕，向监听者报告此事
+            chat.sendMessage(conn, channel, "source", ":done");
 
+            // 工作完成后，清理无用的日志文件
             while (waiting.size() > 0) {
-                long clean = clean(waiting,count);
+                long clean = clean(waiting, count);
                 if (clean > 0) {
                     bytesInRedis -= clean;
                 } else {
@@ -119,14 +127,20 @@ public class ProcessLog {
             }
         }
 
-
+        /**
+         * 清理日志文件
+         *
+         * @param waiting 待清理的日志文件
+         * @param count   数量
+         * @return 清理的日志文件大小
+         */
         private long clean(Deque<File> waiting, int count) {
             if (waiting == null || waiting.isEmpty()) {
                 return 0;
             }
             File firstFile = waiting.getFirst();
             if (String.valueOf(count).equals(conn.get(channel + firstFile + ":done"))) {
-                conn.del(channel + firstFile,channel + firstFile + ":done");
+                conn.del(channel + firstFile, channel + firstFile + ":done");
                 return waiting.removeFirst().length();
             }
             return 0;
