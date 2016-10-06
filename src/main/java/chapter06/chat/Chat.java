@@ -80,7 +80,7 @@ public class Chat {
     }
 
     @SuppressWarnings("unchecked")
-    private List<ChatMessages> fetchPendingMessage(Jedis conn, String recipient) throws IOException {
+    public List<ChatMessages> fetchPendingMessage(Jedis conn, String recipient) throws IOException {
         // 用户在每个组中的已读消息 tuple<chatId,msgId> msgId：已读消息中id最大的那个
         Set<Tuple> chatSeenMsgSet = conn.zrangeWithScores("seen:" + recipient, 0, -1);
         /*

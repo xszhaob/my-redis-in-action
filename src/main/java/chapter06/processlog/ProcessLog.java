@@ -17,6 +17,72 @@ import java.util.*;
  */
 public class ProcessLog {
 
+    private Chat chat = new Chat();
+
+    public void processLogsFromRedis(Jedis conn, String id, CallBack callBack) throws IOException, InterruptedException {
+        while (true) {
+            List<Chat.ChatMessages> chatMessages = chat.fetchPendingMessage(conn, id);
+            for (Chat.ChatMessages chatMessage : chatMessages) {
+                for (Map<String, Object> message : chatMessage.messages) {
+                    String logFile = (String) message.get("message");
+                    if (":done".equals(logFile)) {
+                        return;
+                    }
+                    if (logFile == null || logFile.isEmpty()) {
+                        continue;
+                    }
+                    InputStream in = new RedisInputStream(conn,chatMessage.chatId + logFile);
+                }
+            }
+            if (chatMessages.isEmpty()) {
+                Thread.sleep(100);
+            }
+        }
+    }
+
+
+    public interface CallBack {
+        void callBack(String line);
+    }
+
+    public class RedisInputStream extends InputStream {
+        private Jedis conn;
+        private String key;
+        private int pos;
+
+        public RedisInputStream(Jedis conn, String key) {
+            this.conn = conn;
+            this.key = key;
+        }
+
+        @Override
+        public int read() throws IOException {
+            byte[] subStr = conn.substr(key.getBytes(), pos, pos);
+            if (subStr == null || subStr.length == 0) {
+                return -1;
+            }
+            pos++;
+            return subStr[0] & 0xff;
+        }
+
+        @Override
+        public int read(byte[] buf, int off, int len) throws IOException {
+            byte[] block = conn.substr(key.getBytes(), pos, pos + (len - off - 1));
+            if (block == null || block.length == 0){
+                return -1;
+            }
+            System.arraycopy(block, 0, buf, off, block.length);
+            pos += block.length;
+            return block.length;
+        }
+
+        @Override
+        public int available() throws IOException {
+            long len = conn.strlen(key);
+            return (int) (len - pos);
+        }
+    }
+
 
     /**
      * 将给定文件存储到redis中
@@ -27,7 +93,6 @@ public class ProcessLog {
         private String channel;
         private int count;
         private long limit;
-        private Chat chat;
 
 
         public CopyLogsThread(File path, String channel, int count, long limit) {
@@ -37,7 +102,6 @@ public class ProcessLog {
             this.channel = channel;
             this.count = count;
             this.limit = limit;
-            this.chat = new Chat();
         }
 
         @Override
