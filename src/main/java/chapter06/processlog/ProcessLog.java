@@ -98,6 +98,11 @@ public class ProcessLog {
             long len = conn.strlen(key);
             return (int) (len - pos);
         }
+
+        @Override
+        public void close() {
+
+        }
     }
 
 
