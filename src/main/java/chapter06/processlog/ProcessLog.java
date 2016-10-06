@@ -3,8 +3,10 @@ package chapter06.processlog;
 import chapter06.chat.Chat;
 import redis.clients.jedis.Jedis;
 
+import javax.swing.*;
 import java.io.*;
 import java.util.*;
+import java.util.zip.GZIPInputStream;
 
 /**
  * author:xszhaobo
@@ -32,6 +34,21 @@ public class ProcessLog {
                         continue;
                     }
                     InputStream in = new RedisInputStream(conn,chatMessage.chatId + logFile);
+                    if (logFile.endsWith(".gz")) {
+                        in = new GZIPInputStream(in);
+                    }
+
+                    BufferedReader reader = new BufferedReader(new InputStreamReader(in));
+                    try {
+                        String readLine;
+                        while ((readLine = reader.readLine()) != null) {
+                            callBack.callBack(readLine);
+                        }
+                        callBack.callBack(null);
+                    } finally {
+                        reader.close();
+                    }
+                    conn.incr(chatMessage.chatId + logFile + ":done");
                 }
             }
             if (chatMessages.isEmpty()) {
