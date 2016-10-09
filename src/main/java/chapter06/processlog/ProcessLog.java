@@ -21,19 +21,33 @@ public class ProcessLog {
 
     private Chat chat = new Chat();
 
+    /**
+     * 给定文件处理器处理日志文件
+     *
+     * @param conn     redis连接
+     * @param id       文件处理器id
+     * @param callBack 回调函数
+     * @throws IOException
+     * @throws InterruptedException
+     */
     public void processLogsFromRedis(Jedis conn, String id, CallBack callBack) throws IOException, InterruptedException {
         while (true) {
+            // id用户获取待处理的日志文件
             List<Chat.ChatMessages> chatMessages = chat.fetchPendingMessage(conn, id);
+            // 处理日志
             for (Chat.ChatMessages chatMessage : chatMessages) {
                 for (Map<String, Object> message : chatMessage.messages) {
                     String logFile = (String) message.get("message");
+                    // 如果文件名称是:done，则认为已经处理完毕
                     if (":done".equals(logFile)) {
                         return;
                     }
                     if (logFile == null || logFile.isEmpty()) {
                         continue;
                     }
-                    InputStream in = new RedisInputStream(conn,chatMessage.chatId + logFile);
+
+                    // 处理文件
+                    InputStream in = new RedisInputStream(conn, chatMessage.chatId + logFile);
                     if (logFile.endsWith(".gz")) {
                         in = new GZIPInputStream(in);
                     }
@@ -48,20 +62,29 @@ public class ProcessLog {
                     } finally {
                         reader.close();
                     }
+
+                    // 处理完成之后，该文件已处理次数+1
                     conn.incr(chatMessage.chatId + logFile + ":done");
                 }
             }
+
+            // 空文件，线程睡眠0.1秒
             if (chatMessages.isEmpty()) {
                 Thread.sleep(100);
             }
         }
     }
 
-
+    /**
+     * 回调接口
+     */
     public interface CallBack {
         void callBack(String line);
     }
 
+    /**
+     * 以redis数据作为数据源的数据流读取类
+     */
     public class RedisInputStream extends InputStream {
         private Jedis conn;
         private String key;
@@ -84,8 +107,9 @@ public class ProcessLog {
 
         @Override
         public int read(byte[] buf, int off, int len) throws IOException {
+            // TODO: 2016/10/9 这个地方是否有问题？
             byte[] block = conn.substr(key.getBytes(), pos, pos + (len - off - 1));
-            if (block == null || block.length == 0){
+            if (block == null || block.length == 0) {
                 return -1;
             }
             System.arraycopy(block, 0, buf, off, block.length);
@@ -99,6 +123,9 @@ public class ProcessLog {
             return (int) (len - pos);
         }
 
+        /**
+         * 重写close方法，不需要关闭文件
+         */
         @Override
         public void close() {
 
@@ -217,7 +244,7 @@ public class ProcessLog {
          * 清理日志文件
          *
          * @param waiting 待清理的日志文件
-         * @param count   数量
+         * @param count   日志处理客户端数量
          * @return 清理的日志文件大小
          */
         private long clean(Deque<File> waiting, int count) {
