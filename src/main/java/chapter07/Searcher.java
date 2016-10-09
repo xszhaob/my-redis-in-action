@@ -2,8 +2,8 @@ package chapter07;
 
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.Transaction;
+import redis.clients.jedis.ZParams;
 
-import java.lang.reflect.Array;
 import java.lang.reflect.InvocationTargetException;
 import java.util.*;
 import java.util.regex.Matcher;
@@ -13,6 +13,7 @@ import java.util.regex.Pattern;
  * Created by Bo.Zhao on 2016/10/9.
  */
 public class Searcher {
+    public static final Pattern QUERY_RE = Pattern.compile("[+-]?[a-z']{2,}]");
     public static final Pattern WORD_RE = Pattern.compile("[a-z']{2,}");
     public static final Set<String> STOP_WORDS = new HashSet<String>();
 
@@ -61,6 +62,43 @@ public class Searcher {
         return trans.exec().size();
     }
 
+
+    public Query parse(String queryString) {
+        Query query = new Query();
+        Matcher matcher = QUERY_RE.matcher(queryString);
+        Set<String> current = new HashSet<String>();
+        while (matcher.find()) {
+            String word = matcher.group().trim();
+            char prefix = word.charAt(0);
+            if (prefix == '-' || prefix == '+') {
+                word = word.substring(1);
+            }
+
+            if (word.length() < 2 || STOP_WORDS.contains(word)) {
+                continue;
+            }
+
+            if (prefix == '-') {
+                query.unwanted.add(word);
+                continue;
+            }
+
+            // TODO: 2016/10/9 last word:+hello current word:hello ?
+            if (!current.isEmpty() || prefix != '+') {
+                query.all.addAll(new ArrayList<String>(current));
+                current.clear();
+            }
+
+            current.add(word);
+        }
+
+        if (!current.isEmpty()) {
+            query.all.addAll(new ArrayList<String>(current));
+        }
+
+        return query;
+    }
+
     /**
      * 对集合进行交集、并集、差集计算的辅助函数
      *
@@ -69,13 +107,12 @@ public class Searcher {
      * @param ttl    设置计算结果缓存的过期时间
      * @param items  操作的集合
      * @return 缓存的key
-     * @throws NoSuchMethodException
-     * @throws InvocationTargetException
-     * @throws IllegalAccessException
      */
     public String setCommon(Transaction trans, String method, int ttl, String... items) {
         String[] keys = new String[items.length];
-        System.arraycopy(items, 0, keys, 0, items.length);
+        for (int i = 0; i < items.length; i++) {
+            keys[i] = "idx:" + items[i];
+        }
         String id = UUID.randomUUID().toString();
         try {
             trans.getClass().getDeclaredMethod(method, String.class, String[].class).invoke(trans, "idx:" + id, keys);
@@ -98,6 +135,46 @@ public class Searcher {
 
     public String difference(Transaction trans, int ttl, String... items) {
         return setCommon(trans, "sdiffstore", ttl, items);
+    }
+
+
+    /**
+     * 对有序集合进行交集、并集的辅助函数
+     *
+     * @param trans  传入的事务流水线
+     * @param method 需要执行的集合操作
+     * @param ttl    设置计算结果缓存的过期时间
+     * @param sets   操作的有序集合
+     * @return 缓存的key
+     */
+    public String zSetCommon(Transaction trans, String method, ZParams zParams, int ttl, String... sets) {
+        String[] keys = new String[sets.length];
+        for (int i = 0; i < sets.length; i++) {
+            keys[i] = "idx:" + sets[i];
+        }
+        String id = UUID.randomUUID().toString();
+        try {
+            trans.getClass().getDeclaredMethod(method, String.class, ZParams.class, sets.getClass()).invoke(trans, "idx:" + id, zParams, keys);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+        trans.expire("idx:" + id, ttl);
+        return id;
+    }
+
+
+    public String zIntesect(Transaction trans, ZParams zParams, int ttl, String... sets) {
+        return zSetCommon(trans, "zinterstore", zParams, ttl, sets);
+    }
+
+    public String zUnionStore(Transaction trans, ZParams zParams, int ttl, String... sets) {
+        return zSetCommon(trans, "zunionstore", zParams, ttl, sets);
+    }
+
+
+    public class Query {
+        public final List<String> all = new ArrayList<String>();
+        public final Set<String> unwanted = new HashSet<String>();
     }
 
 
