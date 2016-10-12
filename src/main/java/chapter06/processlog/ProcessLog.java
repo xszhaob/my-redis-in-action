@@ -3,7 +3,6 @@ package chapter06.processlog;
 import chapter06.chat.Chat;
 import redis.clients.jedis.Jedis;
 
-import javax.swing.*;
 import java.io.*;
 import java.util.*;
 import java.util.zip.GZIPInputStream;
@@ -20,6 +19,18 @@ import java.util.zip.GZIPInputStream;
 public class ProcessLog {
 
     private Chat chat = new Chat();
+
+
+    public static void main(String[] args) throws IOException, InterruptedException {
+        File file = new File("E:\\temp");
+        ProcessLog processLog = new ProcessLog();
+        processLog.new CopyLogsThread(file,"bo.zhao",5,60);
+        processLog.processLogsFromRedis(new Jedis(), "1", new CallBack() {
+            public void callBack(String line) {
+                System.out.println(line);
+            }
+        });
+    }
 
     /**
      * 给定文件处理器处理日志文件
@@ -145,8 +156,7 @@ public class ProcessLog {
 
 
         public CopyLogsThread(File path, String channel, int count, long limit) {
-            this.conn = new Jedis("localhost");
-            this.conn.select(15);
+            this.conn = new Jedis();
             this.path = path;
             this.channel = channel;
             this.count = count;
