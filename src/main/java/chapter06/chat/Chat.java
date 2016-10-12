@@ -138,6 +138,7 @@ public class Chat {
         for (Object[] msgRemove : msgRemoves) {
             trans.zremrangeByScore((String) msgRemove[0], 0, (Double) msgRemove[1]);
         }
+        trans.exec();
         return resultChatMessages;
 
     }
