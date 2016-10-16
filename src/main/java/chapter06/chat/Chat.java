@@ -112,7 +112,10 @@ public class Chat {
                 if (msgId > seenMsgMaxId) {
                     seenMsgMaxId = msgId;
                 }
+                System.out.println("s:" + s);
+                // TODO: 2016/10/16 这里没有写导致系统无法使用，需加上
                 Map<String, Object> message = MyJsonUtil.asMap(s);
+                System.out.println("message:" + message);
                 messages.add(message);
             }
             // 更新聊天组中某用户读取消息的最大id
@@ -159,6 +162,14 @@ public class Chat {
             ChatMessages otherCm = (ChatMessages) other;
             return chatId.equals(otherCm.chatId) &&
                     messages.equals(otherCm.messages);
+        }
+
+        @Override
+        public String toString() {
+            return "ChatMessages{" +
+                    "chatId='" + chatId + '\'' +
+                    ", messages=" + messages +
+                    '}';
         }
     }
 }

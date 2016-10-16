@@ -45,6 +45,7 @@ public class ProcessLog {
         while (true) {
             // id用户获取待处理的日志文件
             List<Chat.ChatMessages> chatMessages = chat.fetchPendingMessage(conn, id);
+            System.out.println(Arrays.toString(chatMessages.toArray()));
             // 处理日志
             for (Chat.ChatMessages chatMessage : chatMessages) {
                 for (Map<String, Object> message : chatMessage.messages) {
