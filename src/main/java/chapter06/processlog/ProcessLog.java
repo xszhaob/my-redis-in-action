@@ -24,7 +24,7 @@ public class ProcessLog {
     public static void main(String[] args) throws IOException, InterruptedException {
         File file = new File("E:\\temp");
         ProcessLog processLog = new ProcessLog();
-        processLog.new CopyLogsThread(file,"bo.zhao",5,60);
+        processLog.new CopyLogsThread(file,"bo.zhao",5,305096450).start();
         processLog.processLogsFromRedis(new Jedis(), "1", new CallBack() {
             public void callBack(String line) {
                 System.out.println(line);
@@ -181,10 +181,8 @@ public class ProcessLog {
                     return name.startsWith("temp_redis");
                 }
             });
-            Arrays.sort(files);
             for (File logFile : files) {
                 long fileSize = logFile.length();
-
                 while (bytesInRedis + fileSize > limit) {
                     long cleaned = clean(waiting, count);
                     if (cleaned > 0) {

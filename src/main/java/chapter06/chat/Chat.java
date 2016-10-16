@@ -88,7 +88,7 @@ public class Chat {
          */
         Transaction trans = conn.multi();
         for (Tuple seenMsgTuple : chatSeenMsgSet) {
-            trans.zrangeByScore("msgs:" + seenMsgTuple.getElement(), String.valueOf(seenMsgTuple.getScore() + 1), "info");
+            trans.zrangeByScore("msgs:" + seenMsgTuple.getElement(), String.valueOf(seenMsgTuple.getScore() + 1), "inf");
         }
         List<Object> recWaitSeeMsgList = trans.exec();
         Iterator<Object> recWaitSeeMsgIterator = recWaitSeeMsgList.iterator();
@@ -133,7 +133,7 @@ public class Chat {
 
         trans = conn.multi();
         for (Object[] seenUpdate : seenUpdates) {
-            trans.zadd((String) seenUpdate[0], (Integer) seenUpdate[1], (String) seenUpdate[2]);
+            trans.zadd((String) seenUpdate[0], (Long) seenUpdate[1], (String) seenUpdate[2]);
         }
         for (Object[] msgRemove : msgRemoves) {
             trans.zremrangeByScore((String) msgRemove[0], 0, (Double) msgRemove[1]);

@@ -112,7 +112,6 @@ public class BetterLock {
         while (System.currentTimeMillis() < end) {
             if (conn.setnx(lockKey, lockId) == 1) {
                 conn.expire(lockKey, lockTimeOut);
-                System.out.println("acquire lock '" + lockName + "',lockId=" + lockId + ",retry " + i);
                 return lockId;
             }
             if (conn.ttl(lockKey) < 0) {
@@ -149,7 +148,6 @@ public class BetterLock {
                 trans.del(lockKey);
                 List<Object> exec = trans.exec();
                 if (exec != null) {
-                    System.out.println("release lock '" + lockName + "',lockId=" + lockId + ",retry " + i);
                     return true;
                 }
                 i++;
