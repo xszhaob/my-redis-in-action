@@ -27,7 +27,7 @@ public class ProcessLog {
         processLog.new CopyLogsThread(file,"bo.zhao",5,305096450).start();
         processLog.processLogsFromRedis(new Jedis(), "1", new CallBack() {
             public void callBack(String line) {
-                System.out.println(line);
+                System.out.print(line);
             }
         });
     }

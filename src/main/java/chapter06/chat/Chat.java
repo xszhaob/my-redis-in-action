@@ -113,7 +113,6 @@ public class Chat {
                     seenMsgMaxId = msgId;
                 }
                 System.out.println("s:" + s);
-                // TODO: 2016/10/16 这里没有写导致系统无法使用，需加上
                 Map<String, Object> message = MyJsonUtil.asMap(s);
                 System.out.println("message:" + message);
                 messages.add(message);
