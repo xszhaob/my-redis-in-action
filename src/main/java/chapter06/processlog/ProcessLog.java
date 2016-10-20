@@ -27,7 +27,7 @@ public class ProcessLog {
         processLog.new CopyLogsThread(file,"bo.zhao",5,305096450).start();
         processLog.processLogsFromRedis(new Jedis(), "1", new CallBack() {
             public void callBack(String line) {
-                System.out.print(line);
+//                System.out.println(line);
             }
         });
     }
@@ -45,7 +45,6 @@ public class ProcessLog {
         while (true) {
             // id用户获取待处理的日志文件
             List<Chat.ChatMessages> chatMessages = chat.fetchPendingMessage(conn, id);
-            System.out.println(Arrays.toString(chatMessages.toArray()));
             // 处理日志
             for (Chat.ChatMessages chatMessage : chatMessages) {
                 for (Map<String, Object> message : chatMessage.messages) {
@@ -70,6 +69,7 @@ public class ProcessLog {
                         while ((readLine = reader.readLine()) != null) {
                             callBack.callBack(readLine);
                         }
+                        // 强制刷新回调函数的缓存
                         callBack.callBack(null);
                     } finally {
                         reader.close();
@@ -119,7 +119,6 @@ public class ProcessLog {
 
         @Override
         public int read(byte[] buf, int off, int len) throws IOException {
-            // TODO: 2016/10/9 这个地方是否有问题？
             byte[] block = conn.substr(key.getBytes(), pos, pos + (len - off - 1));
             if (block == null || block.length == 0) {
                 return -1;

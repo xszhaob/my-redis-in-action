@@ -112,9 +112,7 @@ public class Chat {
                 if (msgId > seenMsgMaxId) {
                     seenMsgMaxId = msgId;
                 }
-                System.out.println("s:" + s);
                 Map<String, Object> message = MyJsonUtil.asMap(s);
-                System.out.println("message:" + message);
                 messages.add(message);
             }
             // 更新聊天组中某用户读取消息的最大id
