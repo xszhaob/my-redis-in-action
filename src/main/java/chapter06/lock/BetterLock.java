@@ -64,7 +64,7 @@ public class BetterLock {
                         String aLock = acquireLockWithTimeOut(conn, "aLock", 100, 1);
                         if (aLock != null) {
                             countList.add(System.currentTimeMillis() - start);
-                            releaseLock(conn, "aLock", aLock, 100);
+                            releaseLock(conn, "aLock", aLock);
                         } else {
                             acquireFailCount.incrementAndGet();
                         }
@@ -131,30 +131,21 @@ public class BetterLock {
      * 解锁。
      * 解锁时将判断锁键对应值是否是给定的值，防止误解锁。
      *
-     * @param conn         redis连接
-     * @param lockName     锁名称
-     * @param lockId       锁键对应值
-     * @param waiteTimeOut 解锁动作的超时时间（毫秒）
+     * @param conn     redis连接
+     * @param lockName 锁名称
+     * @param lockId   锁键对应值
      * @return true如果解锁成功，否则返回false
      */
-    public boolean releaseLock(Jedis conn, String lockName, String lockId, long waiteTimeOut) {
+    public boolean releaseLock(Jedis conn, String lockName, String lockId) {
         String lockKey = "lock:" + lockName;
-        long end = System.currentTimeMillis() + waiteTimeOut;
-        int i = 0;
-        while (System.currentTimeMillis() < end) {
-            conn.watch(lockKey);
-            if (lockId.equals(conn.get(lockKey))) {
-                Transaction trans = conn.multi();
-                trans.del(lockKey);
-                List<Object> exec = trans.exec();
-                if (exec != null) {
-                    return true;
-                }
-                i++;
-                continue;
+        conn.watch(lockKey);
+        if (lockId.equals(conn.get(lockKey))) {
+            Transaction trans = conn.multi();
+            trans.del(lockKey);
+            List<Object> exec = trans.exec();
+            if (exec != null) {
+                return true;
             }
-            conn.unwatch();
-            break;
         }
         return false;
     }

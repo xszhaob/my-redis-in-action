@@ -74,7 +74,7 @@ public class Chat {
         } catch (JsonProcessingException e) {
             e.printStackTrace();
         } finally {
-            lock.releaseLock(conn, "chat:lock:" + chatId, lockId, 100);
+            lock.releaseLock(conn, "chat:lock:" + chatId, lockId);
         }
         return null;
     }
