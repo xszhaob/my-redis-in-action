@@ -160,4 +160,68 @@ public class MyTwitter {
         }
         return result;
     }
+
+    @SuppressWarnings("unchecked")
+    public boolean unFollowUser(Jedis conn,String uid,String followUid) {
+        String followingKey = FOLLOWING_KEY + uid;
+        String followerKey = FOLLOWERS_KEY + followUid;
+
+        if (conn.zscore(followingKey,followUid) == null) {
+            return false;
+        }
+
+        Transaction trans = conn.multi();
+        trans.zrem(followingKey,followUid);
+        trans.zrem(followerKey,uid);
+        trans.zcard(followingKey);
+        trans.zcard(followerKey);
+        trans.zrevrange(STATUS_KEY + followUid,0,HOME_TIMELINE_SIZE - 1);
+        List<Object> execResult = trans.exec();
+        if (execResult == null) {
+            return false;
+        }
+        trans = conn.multi();
+        trans.hset(USER_KEY + uid,"following",String.valueOf(execResult.get(execResult.size() - 3)));
+        trans.hset(USER_KEY + followUid,"followers",String.valueOf(execResult.get(execResult.size() - 2)));
+        trans.zadd(HOME_KEY + uid,getScoreMembers((Set<Tuple>)execResult.get(execResult.size() - 1)));
+        trans.zremrangeByRank(HOME_KEY + uid, 0, -HOME_TIMELINE_SIZE - 1);
+        trans.exec();
+        return true;
+    }
+
+
+    public String postStatus(Jedis conn,String uid,String message,Map<String,String> data) {
+        String id = createStatus(conn, uid, message, data);
+        if (id == null) {
+            return null;
+        }
+        String postTime = conn.hget(STATUS_KEY + id,"posted");
+        if (postTime == null) {
+            return null;
+        }
+        conn.zadd(PROFILE_KEY + uid,Double.parseDouble(postTime),id);
+
+        return id;
+    }
+
+    public void syndicateStatus(Jedis conn,String uid,String statusId,long postedTime,double start) {
+        if (start < 0) {
+            start = 0;
+        }
+        Set<Tuple> tupleSet = conn.zrangeByScoreWithScores(FOLLOWERS_KEY + uid, start + "", "inf", 0, 1000);
+        Pipeline pip = conn.pipelined();
+        for (Tuple tuple : tupleSet) {
+            start = tuple.getScore();
+            pip.zadd(HOME_KEY + tuple.getElement(),postedTime,statusId);
+            pip.zremrangeByRank(HOME_KEY + tuple.getElement(),0,-HOME_TIMELINE_SIZE -1);
+        }
+        pip.sync();
+        if (tupleSet.size() == 1000) {
+            executeLater(conn,"default","syndicateStatus",new Object []{conn,uid,postedTime,start});
+        }
+    }
+
+    public void executeLater(Jedis conn,String queue,String name,Object[] args) {
+        // 调用第6章定义的delay API实现该功能。
+    }
 }
