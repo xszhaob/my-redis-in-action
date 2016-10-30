@@ -30,7 +30,7 @@ public class DelayQueue {
      * @param delay 延迟时间
      * @return 返回放入延迟队列的id，否则为null
      */
-    private String executeLater(Jedis conn, String queue, String name, String args, long delay) {
+    public String executeLater(Jedis conn, String queue, String name, String args, long delay) {
         String id = UUID.randomUUID().toString();
         String member = id + "&&" + queue + "&&" + name + "&&" + args;
         if (delay > 0) {
@@ -46,7 +46,7 @@ public class DelayQueue {
      *
      * @param conn jedis连接
      */
-    private void pollQueue(Jedis conn) {
+    public void pollQueue(Jedis conn) {
         while (true) {
             Set<Tuple> tuples = conn.zrangeWithScores("delayed:", 0, 0);
             if (tuples != null && tuples.size() > 0) {
@@ -56,9 +56,8 @@ public class DelayQueue {
                 }
                 String member = next.getElement();
                 int idIndex = member.indexOf("&&");
-                String id = member.substring(0, idIndex);
                 String queue = member.substring(idIndex + 2, member.indexOf("&&", idIndex + 2));
-                conn.rpush("queue:" + queue, id);
+                conn.rpush("queue:" + queue, member);
             }
         }
     }
