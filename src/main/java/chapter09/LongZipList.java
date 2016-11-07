@@ -1,6 +1,7 @@
 package chapter09;
 
 import org.junit.Test;
+import org.omg.CORBA.portable.Delegate;
 import redis.clients.jedis.DebugParams;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.Pipeline;
@@ -28,18 +29,18 @@ public class LongZipList {
     public static double longZipListPerformance(Jedis conn, String key, int length, int passes, int psize) {
         conn.del(key);
         for (int i = 0; i < length; i++) {
-            conn.rpush(key,String.valueOf(i));
+            conn.rpush(key, String.valueOf(i));
         }
 
         Pipeline pipelined = conn.pipelined();
         long start = System.currentTimeMillis();
         for (int i = 0; i < passes; i++) {
             for (int i1 = 0; i1 < psize; i1++) {
-                pipelined.rpoplpush(key,key);
+                pipelined.rpoplpush(key, key);
             }
             pipelined.sync();
         }
-        return (passes * psize) / (System.currentTimeMillis() -start);
+        return (passes * psize) / (System.currentTimeMillis() - start);
     }
 
     /**
@@ -51,7 +52,7 @@ public class LongZipList {
     public void zipListTest() {
         Jedis conn = new Jedis();
         conn.del("game");
-        conn.rpush("game","a","b","c","d");
+        conn.rpush("game", "a", "b", "c", "d");
         // conn.debug() 查看特定对应的相关信息
         DebugParams params = DebugParams.OBJECT("game");
         String debug = conn.debug(params);
@@ -69,7 +70,7 @@ public class LongZipList {
         只是体积增长到了36个字节（推入的4个元素，每个元素都需要花费
         一个字节存储，并带来两个字节的额外开销）
          */
-        conn.rpush("game","e","f","g","h");
+        conn.rpush("game", "e", "f", "g", "h");
         String debug1 = conn.debug(params);
         System.out.println(debug1);
 
@@ -83,7 +84,7 @@ public class LongZipList {
         for (int i = 0; i < 65; i++) {
             val65.append("i");
         }
-        conn.rpush("game",val65.toString());
+        conn.rpush("game", val65.toString());
         System.out.println(conn.debug(params));
 
         // Value at:00007FD851C6E290 refcount:1 encoding:linkedlist
@@ -95,5 +96,83 @@ public class LongZipList {
         String game = conn.rpop("game");
         System.out.println(game);
         System.out.println(conn.debug(params));
+    }
+
+    @Test
+    public void intSetTest() {
+        Jedis conn = new Jedis();
+        conn.del("game");
+        DebugParams params = DebugParams.OBJECT("game");
+        Pipeline pipelined = conn.pipelined();
+        long start = System.currentTimeMillis();
+        for (int i = 0; i < 500000; i++) {
+            pipelined.sadd("game", i + "");
+            if (i % 400 == 0) {
+                pipelined.sync();
+            }
+        }
+        pipelined.sync();
+        System.out.println("pipelined cost time " + (System.currentTimeMillis() - start) + " ms...");
+        System.out.println(conn.debug(params));
+
+        conn.del("game");
+        pipelined = conn.pipelined();
+        start = System.currentTimeMillis();
+        for (int i = 0; i < 500000; i++) {
+            pipelined.sadd("game", i + "");
+            if (i % 500 == 0) {
+                pipelined.sync();
+            }
+        }
+        pipelined.sync();
+        System.out.println("pipelined cost time " + (System.currentTimeMillis() - start) + " ms...");
+        System.out.println(conn.debug(params));
+
+        conn.del("game");
+        pipelined = conn.pipelined();
+        start = System.currentTimeMillis();
+        for (int i = 0; i < 500000; i++) {
+            pipelined.sadd("game", i + "");
+            if (i % 600 == 0) {
+                pipelined.sync();
+            }
+        }
+        pipelined.sync();
+        System.out.println("pipelined cost time " + (System.currentTimeMillis() - start) + " ms...");
+        System.out.println(conn.debug(params));
+
+        conn.del("game");
+        pipelined = conn.pipelined();
+        start = System.currentTimeMillis();
+        for (int i = 0; i < 500000; i++) {
+            pipelined.sadd("game", i + "");
+            if (i % 700 == 0) {
+                pipelined.sync();
+            }
+        }
+        pipelined.sync();
+        System.out.println("pipelined cost time " + (System.currentTimeMillis() - start) + " ms...");
+        System.out.println(conn.debug(params));
+
+        conn.del("game");
+        pipelined = conn.pipelined();
+        start = System.currentTimeMillis();
+        for (int i = 0; i < 500000; i++) {
+            pipelined.sadd("game", i + "");
+            if (i % 800 == 0) {
+                pipelined.sync();
+            }
+        }
+        pipelined.sync();
+        System.out.println("pipelined cost time " + (System.currentTimeMillis() - start) + " ms...");
+        System.out.println(conn.debug(params));
+
+        /*conn.del("game");
+        start = System.currentTimeMillis();
+        for (int i = 0; i < 500000; i++) {
+            conn.sadd("game", i + "");
+        }
+        System.out.println("not pipelined cost time " + (System.currentTimeMillis() - start) + " ms...");
+        System.out.println(conn.debug(params));*/
     }
 }
