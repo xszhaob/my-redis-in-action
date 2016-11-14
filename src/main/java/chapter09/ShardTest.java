@@ -16,6 +16,7 @@ public class ShardTest {
         if (isDigit(key)) {
             shardId = Integer.parseInt(key,10) / shardSize;
         } else {
+            // 对于不是整数的键，shard_key方法将计算出它们的CRC32校验和。
             CRC32 crc = new CRC32();
             crc.update(key.getBytes());
             long shards = 2 * totalElements / shardSize;
