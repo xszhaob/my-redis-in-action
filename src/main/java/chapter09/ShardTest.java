@@ -1,5 +1,7 @@
 package chapter09;
 
+import redis.clients.jedis.Jedis;
+
 import java.util.zip.CRC32;
 
 /**
@@ -11,10 +13,20 @@ public class ShardTest {
 
     }
 
-    public String shardKey(String base,String key,long totalElements,int shardSize) {
+    public String shardHashGet(Jedis conn, String base, String key, long totalElements, int shardSize) {
+        String shard = shardKey(base, key, totalElements, shardSize);
+        return conn.hget(shard, key);
+    }
+
+    public Long shardHashSet(Jedis conn, String base, String key, String value, long totalElements, int shardSize) {
+        String shard = shardKey(base, key, totalElements, shardSize);
+        return conn.hset(shard, key, value);
+    }
+
+    public String shardKey(String base, String key, long totalElements, int shardSize) {
         long shardId = 0;
         if (isDigit(key)) {
-            shardId = Integer.parseInt(key,10) / shardSize;
+            shardId = Integer.parseInt(key, 10) / shardSize;
         } else {
             // 对于不是整数的键，shard_key方法将计算出它们的CRC32校验和。
             CRC32 crc = new CRC32();
